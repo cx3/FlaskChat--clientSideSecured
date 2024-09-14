@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creating new private chat room</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+
+<style>
+
+body {
+    background-color: #121212;
+    color: #00FF00;
+}
+
+.card {
+    background-color: #1E1E1E;
+    border-color: #333333;
+    color: #00FF00;
+}
+
+.form-control {
+    background-color: #333333;
+    color: #00FF00;
+    border-color: #444444;
+}
+
+.form-control:focus {
+    background-color: #000000;
+    color: #FFFF00;
+}
+
+.btn-primary {
+    background-color: #444444;
+    border-color: #555555;
+}
+
+.btn-primary:hover {
+    background-color: #555555;
+}
+
+.card-header {
+    background-color: #333333;
+    border-color: #444444;
+    color: #00FF00;
+}
+
+.chat-panel,
+.user-list-panel {
+    height: 500px;
+    overflow-y: auto;
+}
+
+
+.popup {
+    display: none;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 20%;
+    transform: translate(-50%, -50%);
+    border: 1px solid #888;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 1000;
+    background-color: #001402;
+    color: #013d07;
+    padding: 20px;
+}
+
+
+.popup-content {
+    position: relative;
+}
+
+
+.close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 20px;
+    color: red;
+    cursor: pointer;
+}
+</style>
+
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header" style="color: yellow;">Create new private encrypted chat room</div>
+                    <div class="card-body">
+                        {% if error %}
+                            <div class="alert alert-danger" role="alert">
+                                {{ error }}
+                            </div>
+                        {% endif %}
+                        <form id="login-form" method="POST" action="/create">
+
+                            <div class="form-group">
+                                <label for="roomname">New room name</label>
+                                <input type="text" class="form-control" id="roomname" name="roomname" value="{% if roomname %}{{ roomname }}{% else %}new room{% endif %}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="username">Your username</label>
+                                <input type="text" class="form-control" id="username" name="username" value="{% if username %}{{ username }}{% else %}Admin{% endif %}" required>
+                            </div>
+                            <div class="form-group">
+								<div id="password-strength-message" class="mb-2"></div>
+							
+                                <label for="password">Room's password</label>
+                                <input type="password" class="form-control" id="password" name="password" value="" required>
+
+                                <label id="renderPassword" style="font-size: small; color: blue; cursor: pointer;">render safe password?</label>
+                            </div>
+                            <button type="submit" class="btn btn-secondary" id="createBtn">Create</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<div id="popup" class="popup">
+    <div class="popup-content">
+        <p id="renderedPassword"></p>
+        <span class="close" onclick="closePopup()">&times;</span>
+    </div>
+</div>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+
+
+<script>
+   function openPopup() {
+       document.getElementById('popup').style.display = 'block';
+   }
+   function closePopup() {
+       document.getElementById('popup').style.display = 'none';
+   }
+
+
+
+$(document).ready(function() {
+
+    function getRandomChar(charset) {
+        var randomIndex = Math.floor(Math.random() * charset.length);
+        return charset[randomIndex];
+    }
+    function shuffleString(string) {
+        var array = string.split('');
+        for (var i = array.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+        }
+        return array.join('');
+    }
+
+    function generatePassword() {
+        var length = 10;
+        var charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-=,.";
+        var password = "";
+
+        for (var i = 0; i < 2; i++) {
+            password += getRandomChar("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        }
+        for (var i = 0; i < 2; i++) {
+            password += getRandomChar("0123456789");
+        }
+        for (var i = 0; i < 2; i++) {
+            password += getRandomChar("!@#$%^&*()-=,.");
+        }
+        while (password.length < length) {
+            password += getRandomChar(charset);
+        }
+        return shuffleString(password);
+    }
+
+
+	$('#renderPassword').on('click', function() {
+         $('#renderedPassword').text(generatePassword());
+         $('#password').val($('#renderedPassword').text()).trigger('keyup');
+		 openPopup();
+    });
+
+		
+ var params = new URLSearchParams(window.location.search);
+
+    params.forEach(function(value, key) {
+        var element = $('#' + key);
+        if (element.length) {
+            element.val(value);
+        }
+    });
+
+
+
+    function stripHTML(input) {
+        return $('<div>').text(input).html();
+    }
+
+    $('input').on('keyup', function() {
+        $(this).val(stripHTML($(this).val()));
+    });
+		
+
+			$('#createBtn').prop('disabled', true);
+			$('#createBtn').attr('class', "btn btn-secondary");
+		
+
+$('#password').on('keyup', function () {
+        let password = $(this).val();
+        let strengthResult = checkPasswordStrength(password);
+
+        let messageElement = $('#password-strength-message');
+        messageElement.text(`Password strength: ${strengthResult.strengthLabel}`);
+        messageElement.removeClass();
+        messageElement.addClass('mb-2');
+
+        if (strengthResult.strength <= 1) {
+            messageElement.addClass('text-danger'); // Słabe hasło
+        } else if (strengthResult.strength === 2) {
+            messageElement.addClass('text-warning'); // Średnie hasło
+			$('#createBtn').attr('class', 'btn btn-secondary');
+        } else {
+            messageElement.addClass('text-success'); // Silne hasło
+			$('#createBtn').attr('class', 'btn btn-success');
+        }
+
+        if (strengthResult.improvements.length > 0) {
+            messageElement.append('<br>' + strengthResult.improvements.join('<br>'));
+        }
+
+		if ($('#password').val().length > 8) {
+				$('#createBtn').prop('disabled', false);
+			} else {
+				$('#password-strength-message').attr('class', 'text-danger');
+				$('#createBtn').prop('disabled', true); // $('#createBtn').hide();
+			}
+		
+        if (strengthResult.strength >= 3) {
+			$('#createBtn').attr('class', "btn btn-success");
+        } else {
+            $('#createBtn').prop('disabled', true); // $('#createBtn').hide();
+        }
+    });
+	$('#password').trigger('keyup');
+
+
+    function checkPasswordStrength(password) {
+        let strength = 0;
+        let improvements = [];
+
+        if (password.length >= 8) strength++;
+        else improvements.push("Password must consist of 8 signs");
+
+        if (/[A-Z]/.test(password)) strength++;
+        else improvements.push("Add at least one big letter.");
+
+        if (/[a-z]/.test(password)) strength++;
+        else improvements.push("Add at least one little letter.");
+
+        if (/\d/.test(password)) strength++;
+        else improvements.push("Add at least one number.");
+
+        if (/[@$!%*?&]/.test(password)) strength++;
+        else improvements.push("Add at least one special sign (np. @, $, !, %, *, ?, &).");
+
+        let strengthLabel;
+        switch(strength) {
+            case 0:
+            case 1:
+                strengthLabel = "Very weak";
+                break;
+            case 2:
+                strengthLabel = "Weak";
+                break;
+            case 3:
+                strengthLabel = "Medium";
+                break;
+            case 4:
+                strengthLabel = "Strong";
+                break;
+            case 5:
+                strengthLabel = "Very strong";
+                break;
+        }
+
+        return {
+            strength: strength,
+            strengthLabel: strengthLabel,
+            improvements: improvements
+        };
+    }
+
+
+
+	$('#roomname').on('keyup', function() {
+				let roomname = $(this).val();
+
+				if (roomname.length < 1) {
+				    $('#createBtn').prop('disabled', true);
+				    return false;
+				}
+
+                    $.ajax({
+						type: 'POST',
+						url: '/ask',
+						data: JSON.stringify({ 
+							room_name_free: roomname,
+							mode: "create"
+						}),
+						contentType: 'application/json',
+						dataType: 'json',
+						success: function(response) {
+							//console.log("resp1:" + response.room_name_free);
+							//console.log("resp2:" + response['room_name_free']);
+							
+							if ("room_name_free" in response) {
+								if (response.room_name_free === true || response.room_name_free == true || response.room_name_free + "" == "true") {
+									$('#roomname').css('background-color', 'black');
+								} else {
+									$('#roomname').css('background-color', 'red');
+								}
+							}
+						},
+						error: function(xhr, status, error) {
+							alert('Error: ' + error);
+						}
+					});
+			});
+
+	$('#username').on('keyup', function() {
+		if ($(this).val().length < 1) {
+		    $('#createBtn').prop('disabled', true);
+		    $(this).css('background-color', 'red');
+		} else {
+		    $(this).css('background-color', 'black');
+		    $('#createBtn').prop('disabled', false);
+		}
+	});
+		
+		
+
+            $('#login-form').submit(function(event) {
+				event.preventDefault();
+
+				function hash(text) {
+                    let result = text;
+                    for (let i=0;  i<358;  ++i) {
+                        result = CryptoJS.SHA512(result).toString(CryptoJS.enc.Hex);
+                    }
+                    return result;
+                }
+
+				function passwordToServer(password) {
+					return hash(password.slice(0, 32));
+				}
+
+                var roomname = $('#roomname').val();
+                var username = $('#username').val();
+                var password = $('#password').val();
+
+                var hashedPassword = hash(password);
+				var serverPassword = passwordToServer(hashedPassword);
+
+                var sessionDataDict = {
+                    roomName: roomname,
+                    userName: username,
+                    password: hashedPassword
+                };
+
+                var sessionText = JSON.stringify(sessionDataDict);
+                sessionStorage.setItem(roomname, sessionText);
+
+                $('#password').val(serverPassword);
+
+                this.submit();
+                $('#password').val("");
+            });
+        });
+    </script>
+</body>
+</html>

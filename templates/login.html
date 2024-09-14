@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+
+body {
+    background-color: #121212;
+    color: #00FF00;
+}
+
+.card {
+    background-color: #1E1E1E;
+    border-color: #333333;
+    color: #00FF00;
+}
+
+.form-control {
+    background-color: #333333;
+    color: #00FF00;
+    border-color: #444444;
+}
+
+.form-control:focus {
+    background-color: #000000;
+    color: #FFFF00;
+}
+
+.btn-primary {
+    background-color: #444444;
+    border-color: #555555;
+}
+
+.btn-primary:hover {
+    background-color: #555555;
+}
+
+.card-header {
+    background-color: #333333;
+    border-color: #444444;
+    color: #00FF00;
+}
+
+.chat-panel,
+.user-list-panel {
+    height: 500px;
+    overflow-y: auto;
+}
+</style>
+
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Join existing room <span> or create <a href="/create">new</a></span></div>
+                    <div class="card-body">
+                        {% if error %}
+                            <div class="alert alert-danger" role="alert">
+                                {{ error }}. Attempts count: {{ attempts }}
+                            </div>
+                        {% endif %}
+                        <form id="login-form" method="POST" action="/login">
+
+                            <div class="form-group">
+                                <label for="roomname">Room</label>
+                                <input type="text" class="form-control" id="roomname" name="roomname" value="{% if roomname %}{{ roomname }}{% else %}{% endif %}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="username">Username</label>
+                                <input type="text" class="form-control" id="username" name="username" value="{% if username%}{{ username }}{% else %}{% endif %}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="password">Password</label>
+                                <input type="password" class="form-control" id="password" name="password" value="" required>
+                            </div>
+                            <button type="submit" class="btn btn-secondary" id="loginBtn">Login</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+
+        $(document).ready(function() {
+            var params = new URLSearchParams(window.location.search);
+            params.forEach(function(value, key) {
+                var element = $('#' + key);
+                if (element.length) {
+                    element.val(value);
+                }
+            });
+
+
+            var attempts = {% if not attempts %}0{% else %}{{ attempts }}{% endif %};
+
+		if (attempts == 0) {
+		    $('#loginBtn').prop('disabled', true);
+		}
+		$('#username').trigger('keyup');
+		$('#roomname').trigger('keyup');
+		var f1 = false;
+		var f2 = false;
+
+			function setButton(fieldNr, value) {
+				if (fieldNr == 0) {
+					f1 = value;
+				}
+				if (fieldNr == 1) {
+					f2 = value;
+				}
+				if (f1 == f2 && (f1 == true || f1 === true) ) {
+					$('#loginBtn').prop('disabled', false);
+
+					if ($('#password').val().length >= 8) {
+				        $('#loginBtn').attr('class', 'btn btn-success');
+				    } else {
+				        $('#loginBtn').attr('class', 'btn btn-secondary');
+				    }
+				} else {
+					$('#loginBtn').prop('disabled', true);
+				}
+			}
+
+
+
+$('#roomname').on('keyup', function() {
+				let roomname = $(this).val();
+
+                    $.ajax({
+						type: 'POST',
+						url: '/ask',
+						data: JSON.stringify({
+							room_name_free: roomname,
+							mode: "login"
+						}),
+						contentType: 'application/json',
+						dataType: 'json',
+						success: function(response) {
+							console.log("resp1:" + response.room_name_free);
+							console.log("resp2:" + response['room_name_free']);
+
+							if ("room_name_free" in response) {
+								if (response.room_name_free === true || response.room_name_free == true || response.room_name_free + "" == "true") {
+									$('#roomname').css('background-color', 'red');
+									setButton(0, false);
+								} else {
+									$('#roomname').css('background-color', 'black');
+									setButton(0, true);
+								}
+							}
+						},
+						error: function(xhr, status, error) {
+							alert('Error: ' + error);
+						}
+					});
+			});
+
+
+$('#username').on('keyup', function() {
+				let roomname = $(this).val();
+
+                    $.ajax({
+						type: 'POST',
+						url: '/ask',
+						data: JSON.stringify({
+							room_name_free: $('#roomname').val(),
+							user_name_free: $('#username').val(),
+							mode: "login"
+						}), // Serializacja danych do formatu JSON
+						contentType: 'application/json', // Wskazujemy, że dane są w formacie JSON
+						dataType: 'json', // Oczekujemy odpowiedzi w formacie JSON
+						success: function(response) {
+							//console.log("resp1:" + response.room_name_free);
+							//console.log("resp2:" + response['room_name_free']);
+							console.log("obslugujemy $('#username').on('keyup', function() {");
+
+							if ("user_name_free" in response) {
+								if (response.user_name_free === true || response.user_name_free == true || response.user_name_free + "" == "true") {
+									$('#username').css('background-color', 'black');
+									setButton(1, true);
+								} else {
+									$('#username').css('background-color', 'red');
+									setButton(1, false);
+								}
+							}
+						},
+						error: function(xhr, status, error) {
+							alert('Error: ' + error);
+						}
+					});
+				$('#roomname').trigger('keyup');
+			});
+
+
+$('#password').on('keyup', function(){
+    if ($('#password').val().length >= 8) {
+		$('#loginBtn').attr('class', 'btn btn-success');
+	} else {
+		$('#loginBtn').attr('class', 'btn btn-secondary');
+	}
+});
+
+
+            $('#login-form').submit(function(event) {
+				event.preventDefault(); // Zapobiega domyślnemu wysłaniu formularza
+
+				function hash(text) {
+                    let result = text;
+                    for (let i=0;  i<358;  ++i) {
+                        result = CryptoJS.SHA512(result).toString(CryptoJS.enc.Hex);
+                    }
+                    return result;
+                }
+
+				function passwordToServer(password) {
+					return hash(password.slice(0, 32));
+				}
+
+                // Pobierz wartości z pól formularza
+                var roomname = $('#roomname').val();
+                var username = $('#username').val();
+                var password = $('#password').val();
+
+                var hashedPassword = hash(password);
+				var serverPassword = passwordToServer(hashedPassword);
+
+                var sessionDataDict = {
+                    roomName: roomname,
+                    userName: username,
+                    password: hashedPassword
+                };
+
+                var sessionText = JSON.stringify(sessionDataDict);
+                sessionStorage.setItem(roomname, sessionText);
+
+                $('#password').val(serverPassword);
+
+                this.submit();
+                $('#password').val("");
+            });
+        });
+    </script>
+</body>
+</html>

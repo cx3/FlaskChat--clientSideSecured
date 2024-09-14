@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+{% for pair in pairs %}
+
+<a href="/chat/{{ pair[0] }}">{{ pair }}</a> ( {{ pair[0] }}   {{ pair[1] }} ) <br>
+
+{% endfor %}
+
+</body>
+</html>
