@@ -62,7 +62,7 @@ body {
                     <div class="card-body">
                         {% if error %}
                             <div class="alert alert-danger" role="alert">
-                                {{ error }}. Attempts count: {{ attempts }}
+                                {{ error }}. {% if attempts %}Attempts count: {{ attempts }} {% endfor %}
                             </div>
                         {% endif %}
                         <form id="login-form" method="POST" action="/login">
