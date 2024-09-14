@@ -30,7 +30,7 @@ def index_route():
 @app.route('/rooms', methods=['GET'])
 def rooms_route():
     if len(rooms):
-        return ''.join(f'<a href="/chat/{name}">{name} {len(rooms.get_usernames_of_room(name))}</a><br>'
+        return ''.join(f'<a href="/chat/{name}">name={name} users={len(rooms.get_usernames_of_room(name))}</a><br>'
                        for name in rooms.room_names())
     return redirect('/create')
 
@@ -86,10 +86,19 @@ def create_new_room_route():
         room_name = request.form.get('roomname', False)
         user_name = request.form.get('username', False)
         passwd = request.form.get('password', False)
+        addr = get_ip_route()
 
         if room_name and user_name and passwd:
             room_name, user_name = sanitize(room_name), sanitize(user_name)
             user = RoomUser(user_name, get_ip_route())
+
+            if rooms.is_ip_in_room(addr, room_name):
+                return render_template(
+                    'create.html',
+                    roomname=room_name,
+                    username=user_name,
+                    error="Cannot login to same room with other/same nick name"
+                )
 
             if rooms.join_user_to_room(user, room_name, passwd):
                 return redirect(url_for('chat_room_route', user_name=user_name, room_name=room_name))
@@ -136,13 +145,22 @@ def login_route():
 
         if room_name and user_name and passwd:
             room_name, user_name = sanitize(room_name), sanitize(user_name)
-            user = RoomUser(user_name, get_ip_route())
+            addr = get_ip_route()
+            user = RoomUser(user_name, addr)
+
+            if rooms.is_ip_in_room(get_ip_route(), room_name):
+                return render_template(
+                    'login.html',
+                    user_name=rooms.name_by_ip_in_room(room_name, addr),
+                    room_name=room_name,
+                    error="Cannot login twice to same room. One chat in one tab/window, by one IP address."
+                )
 
             if rooms.join_user_to_room(user, room_name, passwd):
                 session['login_attempts'] = 0
                 return f"""
                 <script>
-                   window.location.href="/chat/{room_name}";
+                     window.location.href="/chat/{room_name}";
                 </script>
                 """
             else:
@@ -161,6 +179,13 @@ def login_route():
 
 @app.route('/chat/<room_name>', methods=['POST', 'GET'])
 def chat_room_route(room_name: str):
+    if 'user_name' not in request.args:
+        return redirect(url_for(
+            'login_route',
+            roomname=str(room_name),
+            error="Cannot login twice to room using same/other nick, using one ip")
+        )
+
     if rooms.is_ip_in_room(request.remote_addr, room_name):
         addr = get_ip_route()
         user_name = rooms.name_by_ip_in_room(room_name, addr)
@@ -183,14 +208,15 @@ def handle_join(data: dict):
     logger.info(f'socketio join route. data={data}')
     logger.info(f'request addr: {addr}')
 
-    room: bool = data.get('room', False)
+    room = data.get('room', '')
     username = data.get('username', False)
     token = data.get('token', False)
     
-    if room and username and token:
+    if room != '' and username and token:
         if tokens.is_valid(ip=addr, user_name=username, room_name=room):
             room: str
             join_room(room)
+            session['']
 
             names = rooms.get_usernames_of_room(room)
             emit('update_user_list', names, to=room)
@@ -243,7 +269,6 @@ def handle_logout(data):
 @socketio.on('message')
 def handle_message(data: dict):
 
-    logger.info('recv message from client')
     if isinstance(data, dict):
         user = data.get('user_name', False)
         room = data.get('room_name', '')
@@ -253,6 +278,10 @@ def handle_message(data: dict):
         if user and msg and room != '' and token:
             addr = get_ip_route()
             if tokens.is_valid(ip=addr, user_name=user, room_name=room):
+                part = f'{msg}'
+                part = f'{part}' + '-' * (10 - len(part)) if len(part) < 10 else part
+                logger.info(f'recv message from client, part of msg: {part}')
+
                 names = [_.get_name() for _ in rooms.get_users_of_room(room)]
                 emit('update_user_list', names, to=room)
                 send(f'{user}: {msg}', room=room)
