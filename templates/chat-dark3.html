@@ -195,7 +195,7 @@
                         <button class="btn btn-success" id="send-btn">Send</button>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-outline-danger" id="logoutButton">Leave chat</button>
+                        <button type="button" class="btn btn-outline-danger" id="logoutButton">Leave room</button>
                     </div>
                 </div>
             </div>
@@ -383,6 +383,7 @@ $(document).ready(function () {
 
     $('#logoutButton').click(function () {
         socket.emit('logout', d);
+        socket.emit('unjoin', d);
         window.location.href = '/login?next={{ room_name }}';
     });
 

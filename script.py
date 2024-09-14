@@ -148,19 +148,11 @@ def login_route():
             addr = get_ip_route()
             user = RoomUser(user_name, addr)
 
-            if rooms.is_ip_in_room(get_ip_route(), room_name):
-                return render_template(
-                    'login.html',
-                    user_name=rooms.name_by_ip_in_room(room_name, addr),
-                    room_name=room_name,
-                    error="Cannot login twice to same room. One chat in one tab/window, by one IP address."
-                )
-
             if rooms.join_user_to_room(user, room_name, passwd):
                 session['login_attempts'] = 0
                 return f"""
                 <script>
-                     window.location.href="/chat/{room_name}";
+                     window.location.href="/chat/{room_name}?user_name={user_name}";
                 </script>
                 """
             else:
@@ -216,8 +208,6 @@ def handle_join(data: dict):
         if tokens.is_valid(ip=addr, user_name=username, room_name=room):
             room: str
             join_room(room)
-            session['']
-
             names = rooms.get_usernames_of_room(room)
             emit('update_user_list', names, to=room)
             send(f'{data["username"]} has joined the room {room}.', room=room)
@@ -228,7 +218,6 @@ def handle_unjoin(data: dict):
     logger.info('socketio unjoin data=', data)
 
     addr = get_ip_route()
-
     room = data.get('roomname', False)
     user = data.get('username', False)
     token = data.get('token', False)
@@ -236,10 +225,19 @@ def handle_unjoin(data: dict):
     if room and user and token:
         room: str or bool
         logger.info('attempt to unjoin user from room...')
-        if rooms.unjoin_user_from_room(RoomUser(user, addr), room):
-            # update_user_list
-            emit('update_user_list', rooms.get_usernames_of_room(room), to=room)
-            send(f'{data["username"]} has left the room {room}.', room=room)
+        if rooms.is_ip_in_room(addr, room):
+            # logger.info('usuwanie 1 if')
+            if user == rooms.name_by_ip_in_room(room, addr):
+                # logger.info('usuwanie 2 if')
+                if rooms.unjoin_user_from_room(RoomUser(user, addr), room):
+                    logger.info(f'USER "{user}" unjoined from room "{room}"')
+
+                    names = rooms.get_usernames_of_room(room)
+                    if names:
+                        emit('update_user_list', names, to=room)
+                        send(f'{data["username"]} has left the room {room}.', room=room)
+                    else:
+                        rooms.delete_empty_rooms()
 
 
 @socketio.on('connect')
@@ -248,22 +246,19 @@ def handle_connect():
 
 
 @socketio.on('disconnect')
-def handle_disconnect(data=None):
+def handle_disconnect(data: dict = None):
     logger.info(f'Client disconnected  ip: {request.remote_addr}   data={data}')
-    for room, user in rooms.unjoin_ip_everywhere(request.remote_addr):
-        logger.info(f'> unjoined by ip in room {room}')
-        users = rooms.get_users_of_room(room)
-        if users:
-            emit('update_user_list', rooms.get_usernames_of_room(room), to=room)
+    if data:
+        logger.info(f'> invoked handle_unjoin with dict: data = {data}')
+        handle_unjoin(data)
 
 
 @socketio.on('logout')
 def handle_logout(data):
-    logger.info(f'handle logout, {data}')
-    logger.info('addr: ', request.remote_addr)
-    # print('User logged out:', request.sid)
-    emit('message', f"{data['userName']} left from room", to=data["roomName"])
-    emit('update_user_list', rooms.get_usernames_of_room(data['roomName']), to=data["roomName"])
+    logger.info(f'handle logout, {data},\t\taddr={request.remote_addr}')
+    handle_unjoin(data)
+    emit('message', f"{data['username']} left from room", to=data["roomname"])
+    emit('update_user_list', rooms.get_usernames_of_room(data['roomname']), to=data["roomname"])
 
 
 @socketio.on('message')
@@ -278,9 +273,8 @@ def handle_message(data: dict):
         if user and msg and room != '' and token:
             addr = get_ip_route()
             if tokens.is_valid(ip=addr, user_name=user, room_name=room):
-                part = f'{msg}'
-                part = f'{part}' + '-' * (10 - len(part)) if len(part) < 10 else part
-                logger.info(f'recv message from client, part of msg: {part}')
+                part = f'{msg}'[:10].ljust(10, '-')
+                logger.info(f'recv message from client, part of msg: {part}...')
 
                 names = [_.get_name() for _ in rooms.get_users_of_room(room)]
                 emit('update_user_list', names, to=room)
